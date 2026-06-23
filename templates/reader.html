@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lendo | Hana Reader 🌸</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="reader-body">
+  <header class="reader-header" id="readerHeader">
+    <div class="reader-header-inner">
+      <a href="/" class="logo">🌸 Hana</a>
+      <div class="reader-nav">
+        <button class="reader-btn" id="btnPrev" onclick="prevPage()" title="Anterior (seta esq)">←</button>
+        <span class="reader-progress" id="readerProgress">...</span>
+        <button class="reader-btn" id="btnNext" onclick="nextPage()" title="Proxima (seta dir)">→</button>
+      </div>
+      <div class="reader-controls">
+        <button class="mode-btn active" id="btnPaged" onclick="setMode('paged', this)" title="Modo paginado">📖</button>
+        <button class="mode-btn" id="btnStrip" onclick="setMode('strip', this)" title="Long strip">📜</button>
+        <a class="reader-btn" id="backManga" href="#">×</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="reader-container" id="readerContainer">
+    <div class="loading-full"><div class="spinner"></div></div>
+  </div>
+
+  <div class="reader-footer" id="readerFooter">
+    <button class="footer-nav-btn" id="footerPrev" onclick="prevPage()">← Anterior</button>
+    <div class="footer-thumbnails" id="footerThumbs"></div>
+    <button class="footer-nav-btn" id="footerNext" onclick="nextPage()">Proxima →</button>
+  </div>
+
+  <script>
+    const mangaId = '{{ manga_id }}';
+    const chapterId = '{{ chapter_id }}';
+    let pages = [];
+    let currentPage = 0;
+    let mode = 'paged';
+    let headerVisible = true;
+    let headerTimer = null;
+
+    async function init() {
+      document.getElementById('backManga').href = `/manga/${mangaId}`;
+
+      try {
+        const [pagesRes, infoRes] = await Promise.all([
+          fetch(`/api/chapter/${chapterId}/pages`),
+          fetch(`/api/chapter/${chapterId}`)
+        ]);
+        const pagesData = await pagesRes.json();
+        const infoData = await infoRes.json();
+
+        pages = pagesData.pages || [];
+        if (!pages.length) {
+          document.getElementById('readerContainer').innerHTML = '<p class="error-msg" style="color:#fff;padding:2rem">Capitulo sem paginas disponiveis.</p>';
+          return;
+        }
+
+        const num = infoData.data?.attributes?.chapter || '';
+        const title = infoData.data?.attributes?.title || '';
+        document.title = `Cap. ${num}${title?' - '+title:''} | Hana Reader`;
+
+        renderReader();
+        setupKeyboard();
+        setupAutoHideHeader();
+      } catch(e) {
+        document.getElementById('readerContainer').innerHTML = '<p class="error-msg" style="padding:2rem">Erro ao carregar capitulo.</p>';
+      }
+    }
+
+    function renderReader() {
+      if (mode === 'paged') renderPaged();
+      else renderStrip();
+      updateProgress();
+      renderThumbs();
+    }
+
+    function renderPaged() {
+      const c = document.getElementById('readerContainer');
+      c.className = 'reader-container paged';
+      c.innerHTML = `<div class="page-wrap">
+        <img class="page-img" src="${pages[currentPage]}" alt="Pagina ${currentPage+1}" onload="this.classList.add('loaded')">
+      </div>
+      <div class="page-click-left" onclick="prevPage()"></div>
+      <div class="page-click-right" onclick="nextPage()"></div>`;
+    }
+
+    function renderStrip() {
+      const c = document.getElementById('readerContainer');
+      c.className = 'reader-container strip';
+      c.innerHTML = pages.map((url, i) =>
+        `<img class="strip-img" src="${url}" alt="Pagina ${i+1}" loading="lazy" onload="this.classList.add('loaded')">`
+      ).join('');
+    }
+
+    function setMode(m, btn) {
+      mode = m;
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('readerFooter').style.display = m === 'paged' ? 'flex' : 'none';
+      renderReader();
+    }
+
+    function prevPage() {
+      if (mode === 'strip') return;
+      if (currentPage > 0) { currentPage--; renderPaged(); updateProgress(); highlightThumb(); }
+    }
+
+    function nextPage() {
+      if (mode === 'strip') return;
+      if (currentPage < pages.length - 1) { currentPage++; renderPaged(); updateProgress(); highlightThumb(); }
+      else showToast('Ultimo capitulo desta selecao!');
+    }
+
+    function updateProgress() {
+      document.getElementById('readerProgress').textContent =
+        mode === 'paged' ? `${currentPage+1} / ${pages.length}` : `${pages.length} paginas`;
+    }
+
+    function renderThumbs() {
+      const t = document.getElementById('footerThumbs');
+      t.innerHTML = pages.map((url, i) =>
+        `<img class="thumb${i===currentPage?' active':''}" src="${url}" onclick="goTo(${i})" loading="lazy">`
+      ).join('');
+    }
+
+    function highlightThumb() {
+      document.querySelectorAll('.thumb').forEach((el,i) => el.classList.toggle('active', i===currentPage));
+      const active = document.querySelector('.thumb.active');
+      if (active) active.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+    }
+
+    function goTo(i) {
+      if (mode === 'strip') return;
+      currentPage = i;
+      renderPaged();
+      updateProgress();
+      highlightThumb();
+    }
+
+    function setupKeyboard() {
+      document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prevPage();
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextPage();
+        if (e.key === 'f') document.body.requestFullscreen?.();
+      });
+    }
+
+    function setupAutoHideHeader() {
+      document.addEventListener('mousemove', showHeader);
+      document.addEventListener('touchstart', showHeader);
+    }
+
+    function showHeader() {
+      const h = document.getElementById('readerHeader');
+      h.classList.remove('hidden');
+      clearTimeout(headerTimer);
+      headerTimer = setTimeout(() => h.classList.add('hidden'), 3000);
+    }
+
+    function showToast(msg) {
+      let t = document.getElementById('toast');
+      if (!t) { t = document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    init();
+  </script>
+
+  <div class="toast" id="toast"></div>
+  <link rel="stylesheet" href="/static/css/style.css">
+</body>
+</html>
