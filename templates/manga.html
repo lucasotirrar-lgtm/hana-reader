@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hana Reader 🌸</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="bg-blobs">
+    <div class="blob blob1"></div>
+    <div class="blob blob2"></div>
+  </div>
+
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">🌸 <span>Hana</span> Reader</a>
+      <nav class="nav">
+        <a href="/" class="nav-link">Inicio</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/">🏠 Inicio</a> <span>/</span> <span id="bcTitle">...</span>
+    </div>
+
+    <div class="manga-hero" id="mangaHero">
+      <div class="loading-full"><div class="spinner"></div></div>
+    </div>
+
+    <div class="chapters-section" id="chaptersSection" style="display:none">
+      <div class="chapters-header">
+        <h2 class="section-title">📚 Capitulos</h2>
+        <div class="lang-toggle">
+          <button class="lang-btn active" data-lang="pt-br" onclick="loadChapters('pt-br', this)">🇧🇷 PT-BR</button>
+          <button class="lang-btn" data-lang="en" onclick="loadChapters('en', this)">🇺🇸 EN</button>
+        </div>
+      </div>
+      <div class="chapters-list" id="chaptersList"></div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>🌸 Hana Reader &mdash; feito com amor &hearts;</p>
+  </footer>
+
+  <script src="/static/js/main.js"></script>
+  <script>
+    const mangaId = '{{ manga_id }}';
+    let mangaData = null;
+
+    async function loadManga() {
+      try {
+        const res = await fetch(`/api/manga/${mangaId}`);
+        const data = await res.json();
+        mangaData = data.data;
+        renderMangaHero(mangaData);
+        document.getElementById('chaptersSection').style.display = 'block';
+        loadChapters('pt-br', document.querySelector('.lang-btn.active'));
+      } catch(e) {
+        document.getElementById('mangaHero').innerHTML = '<p class="error-msg">Erro ao carregar manga.</p>';
+      }
+    }
+
+    function renderMangaHero(m) {
+      const title = m.attributes.title.pt || m.attributes.title['pt-br'] || m.attributes.title.en || Object.values(m.attributes.title)[0] || 'Sem titulo';
+      document.title = title + ' | Hana Reader';
+      document.getElementById('bcTitle').textContent = title;
+      const cover = m.relationships?.find(r => r.type === 'cover_art');
+      const coverUrl = cover ? `/api/cover/${m.id}/${cover.attributes?.fileName}` : '/static/img/no-cover.png';
+      const desc = m.attributes.description?.pt || m.attributes.description?.['pt-br'] || m.attributes.description?.en || '';
+      const status = m.attributes.status || '';
+      const statusLabel = {ongoing:'Em andamento', completed:'Completo', hiatus:'Hiato', cancelled:'Cancelado'}[status] || status;
+      const tags = (m.attributes.tags || []).map(t => `<span class="tag">${t.attributes.name.en || ''}</span>`).join('');
+      const author = m.relationships?.find(r => r.type === 'author');
+      const authorName = author?.attributes?.name || '';
+      document.getElementById('mangaHero').innerHTML = `
+        <div class="manga-cover-wrap">
+          <img class="manga-cover" src="${coverUrl}" alt="${title}" onerror="this.src='/static/img/no-cover.png'">
+        </div>
+        <div class="manga-meta">
+          <h1 class="manga-title">${title}</h1>
+          ${authorName ? `<p class="manga-author">✍️ ${authorName}</p>` : ''}
+          <div class="manga-badges">
+            <span class="badge badge-status ${status}">${statusLabel}</span>
+          </div>
+          <div class="manga-tags">${tags}</div>
+          ${desc ? `<div class="manga-desc">${desc.substring(0,500)}${desc.length>500?'...':''}</div>` : ''}
+        </div>`;
+    }
+
+    async function loadChapters(lang, btn) {
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const list = document.getElementById('chaptersList');
+      list.innerHTML = '<div class="loading-grid"><div class="spinner"></div></div>';
+      try {
+        const res = await fetch(`/api/manga/${mangaId}/chapters?lang=${lang}&limit=500`);
+        const data = await res.json();
+        const chapters = data.data || [];
+        if (!chapters.length) {
+          list.innerHTML = '<p class="empty-msg">Nenhum capitulo disponivel neste idioma.</p>';
+          return;
+        }
+        list.innerHTML = chapters.map(c => {
+          const num = c.attributes.chapter || '?';
+          const chTitle = c.attributes.title || '';
+          const group = c.relationships?.find(r => r.type === 'scanlation_group');
+          const groupName = group?.attributes?.name || '';
+          const pages = c.attributes.pages || 0;
+          return `
+            <a class="chapter-item" href="/read/${mangaId}/${c.id}">
+              <div class="chapter-left">
+                <span class="chapter-num">Cap. ${num}</span>
+                ${chTitle ? `<span class="chapter-title">${chTitle}</span>` : ''}
+              </div>
+              <div class="chapter-right">
+                ${groupName ? `<span class="chapter-group">${groupName}</span>` : ''}
+                <span class="chapter-pages">${pages} pags</span>
+              </div>
+            </a>`;
+        }).join('');
+      } catch(e) {
+        list.innerHTML = '<p class="error-msg">Erro ao carregar capitulos.</p>';
+      }
+    }
+
+    loadManga();
+  </script>
+</body>
+</html>
