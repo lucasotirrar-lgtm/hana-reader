@@ -31,51 +31,30 @@
       <div class="search-wrap">
         <div class="search-box">
           <span class="search-icon">🔍</span>
-          <input
-            type="text"
-            id="searchInput"
-            class="search-input"
-            placeholder="Buscar manhwa, manga... ex: Tears on a Withered Flower"
-            autocomplete="off"
-          >
+          <input type="text" id="searchInput" class="search-input" placeholder="Buscar manhwa, manga... ex: Tears on a Withered Flower" autocomplete="off">
           <button class="search-btn" onclick="doSearch()">Buscar</button>
         </div>
-        <div class="lang-toggle">
-          <button class="lang-btn active" data-lang="pt-br" onclick="setLang('pt-br', this)">🇧🇷 PT-BR</button>
-                  </div>
       </div>
     </section>
 
     <section class="results-section" id="resultsSection" style="display:none">
       <h2 class="section-title" id="resultsTitle">Resultados</h2>
-      <div class="grid" id="mangaGrid"></div>
+      <div class="manga-grid" id="mangaGrid"></div>
       <div class="pagination" id="pagination"></div>
     </section>
 
     <section class="featured-section" id="featuredSection">
       <h2 class="section-title">✨ Popular agora</h2>
-      <div class="grid" id="featuredGrid"><div class="loading-grid"><div class="spinner"></div></div></div>
+      <div class="manga-grid" id="featuredGrid"></div>
     </section>
   </main>
 
-  <footer class="footer">
-    <p>🌸 Hana Reader &mdash; feito com amor &hearts;</p>
-  </footer>
+  <footer class="footer">🌸 Hana Reader — feito com amor ♥</footer>
 
-  <div class="toast" id="toast"></div>
-
-  <script src="/static/js/main.js"></script>
   <script>
-    let currentLang = 'pt-br';
     let currentPage = 0;
     let currentQuery = '';
     const LIMIT = 18;
-
-    function setLang(lang, btn) {
-      currentLang = lang;
-      document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    }
 
     document.getElementById('searchInput').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') doSearch();
@@ -107,28 +86,25 @@
 
     function renderGrid(mangas, gridId) {
       const grid = document.getElementById(gridId);
-      if (!mangas.length) {
-        grid.innerHTML = '<p class="empty-msg">Nenhum resultado encontrado.</p>';
-        return;
-      }
+      if (!mangas.length) { grid.innerHTML = '<p class="empty-msg">Nenhum resultado encontrado.</p>'; return; }
       grid.innerHTML = mangas.map(m => {
-        const title = m.attributes.title.pt || m.attributes.title['pt-br'] || m.attributes.title.en || Object.values(m.attributes.title)[0] || 'Sem titulo';
+        const t = m.attributes.title;
+        const title = t.pt || t['pt-br'] || t.en || Object.values(t)[0] || 'Sem titulo';
         const cover = m.relationships?.find(r => r.type === 'cover_art');
-        const coverUrl = cover ? `/api/cover/${m.id}/${cover.attributes?.fileName}` : '/static/img/no-cover.png';
+        const coverUrl = cover?.attributes?.fileName ? `/api/cover/${m.id}/${cover.attributes.fileName}` : '/static/img/no-cover.png';
         const status = m.attributes.status || '';
         const statusLabel = {ongoing:'Em andamento', completed:'Completo', hiatus:'Hiato', cancelled:'Cancelado'}[status] || status;
         const tags = (m.attributes.tags || []).slice(0,3).map(t => `<span class="tag">${t.attributes.name.en || ''}</span>`).join('');
-        return `
-          <a class="card" href="/manga/${m.id}">
-            <div class="card-cover">
-              <img src="${coverUrl}" alt="${title}" loading="lazy" onerror="this.src='/static/img/no-cover.png'">
-              <div class="card-status ${status}">${statusLabel}</div>
-            </div>
-            <div class="card-info">
-              <h3 class="card-title">${title}</h3>
-              <div class="card-tags">${tags}</div>
-            </div>
-          </a>`;
+        return `<a class="card" href="/manga/${m.id}">
+          <div class="card-cover">
+            <img src="${coverUrl}" alt="${title}" loading="lazy" onerror="this.src='/static/img/no-cover.png'">
+            <div class="card-status ${status}">${statusLabel}</div>
+          </div>
+          <div class="card-info">
+            <h3 class="card-title">${title}</h3>
+            <div class="card-tags">${tags}</div>
+          </div>
+        </a>`;
       }).join('');
     }
 
