@@ -1,134 +1,51 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hana Reader 🌸</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hana Reader</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body>
-  <div class="bg-blobs">
-    <div class="blob blob1"></div>
-    <div class="blob blob2"></div>
-    <div class="blob blob3"></div>
-  </div>
-
-  <header class="header">
-    <div class="header-inner">
-      <a href="/" class="logo">🌸 <span>Hana</span> Reader</a>
-      <nav class="nav">
-        <a href="/" class="nav-link active">Inicio</a>
-      </nav>
-    </div>
+<body data-page="home">
+  <header class="topbar">
+    <a class="brand" href="/">Hana Reader</a>
+    <nav><a class="active" href="/">Inicio</a></nav>
   </header>
 
-  <main class="main">
+  <main class="shell">
     <section class="hero">
-      <h1 class="hero-title">Sua biblioteca <span class="highlight">pessoal</span> de manhwa</h1>
-      <p class="hero-sub">Busque, leia e acompanhe seus manhwas favoritos sem anuncios, sem cadastro.</p>
-      <div class="search-wrap">
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="searchInput" class="search-input" placeholder="Buscar manhwa, manga... ex: Tears on a Withered Flower" autocomplete="off">
-          <button class="search-btn" onclick="doSearch()">Buscar</button>
-        </div>
+      <p class="eyebrow">Biblioteca privada em PT-BR</p>
+      <h1>Leia manhwas e mangas sem cadastro, rapido e limpo.</h1>
+      <form class="search" id="searchForm">
+        <input id="searchInput" placeholder="Buscar por titulo..." autocomplete="off">
+        <button>Buscar</button>
+      </form>
+    </section>
+
+    <section class="filters" aria-label="Filtros">
+      <div>
+        <label for="tagSelect">Categoria</label>
+        <select id="tagSelect"><option value="">Todas</option></select>
+      </div>
+      <div>
+        <label>Letra</label>
+        <div class="letters" id="letters"></div>
       </div>
     </section>
 
-    <section class="results-section" id="resultsSection" style="display:none">
-      <h2 class="section-title" id="resultsTitle">Resultados</h2>
-      <div class="manga-grid" id="mangaGrid"></div>
-      <div class="pagination" id="pagination"></div>
-    </section>
-
-    <section class="featured-section" id="featuredSection">
-      <h2 class="section-title">✨ Popular agora</h2>
-      <div class="manga-grid" id="featuredGrid"></div>
+    <section>
+      <div class="section-head">
+        <h2 id="sectionTitle">Popular agora</h2>
+        <button class="ghost" id="clearBtn" hidden>Limpar</button>
+      </div>
+      <div class="grid" id="mangaGrid"></div>
+      <div class="pager" id="pager"></div>
     </section>
   </main>
 
-  <footer class="footer">🌸 Hana Reader — feito com amor ♥</footer>
-
-  <script>
-    let currentPage = 0;
-    let currentQuery = '';
-    const LIMIT = 18;
-
-    document.getElementById('searchInput').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') doSearch();
-    });
-
-    async function doSearch(page = 0) {
-      const q = document.getElementById('searchInput').value.trim();
-      if (!q) return;
-      currentQuery = q;
-      currentPage = page;
-      showResults();
-      const grid = document.getElementById('mangaGrid');
-      grid.innerHTML = '<div class="loading-grid"><div class="spinner"></div></div>';
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=${LIMIT}&offset=${page * LIMIT}`);
-        const data = await res.json();
-        renderGrid(data.data || [], 'mangaGrid');
-        renderPagination(data.total || 0, page);
-        document.getElementById('resultsTitle').textContent = `Resultados para "${q}" (${data.total || 0})`;
-      } catch(e) {
-        grid.innerHTML = '<p class="error-msg">Erro ao buscar. Tente novamente.</p>';
-      }
-    }
-
-    function showResults() {
-      document.getElementById('resultsSection').style.display = 'block';
-      document.getElementById('featuredSection').style.display = 'none';
-    }
-
-    function renderGrid(mangas, gridId) {
-      const grid = document.getElementById(gridId);
-      if (!mangas.length) { grid.innerHTML = '<p class="empty-msg">Nenhum resultado encontrado.</p>'; return; }
-      grid.innerHTML = mangas.map(m => {
-        const t = m.attributes.title;
-        const title = t.pt || t['pt-br'] || t.en || Object.values(t)[0] || 'Sem titulo';
-        const cover = m.relationships?.find(r => r.type === 'cover_art');
-        const coverUrl = cover?.attributes?.fileName ? `/api/cover/${m.id}/${cover.attributes.fileName}` : '/static/img/no-cover.png';
-        const status = m.attributes.status || '';
-        const statusLabel = {ongoing:'Em andamento', completed:'Completo', hiatus:'Hiato', cancelled:'Cancelado'}[status] || status;
-        const tags = (m.attributes.tags || []).slice(0,3).map(t => `<span class="tag">${t.attributes.name.en || ''}</span>`).join('');
-        return `<a class="card" href="/manga/${m.id}">
-          <div class="card-cover">
-            <img src="${coverUrl}" alt="${title}" loading="lazy" onerror="this.src='/static/img/no-cover.png'">
-            <div class="card-status ${status}">${statusLabel}</div>
-          </div>
-          <div class="card-info">
-            <h3 class="card-title">${title}</h3>
-            <div class="card-tags">${tags}</div>
-          </div>
-        </a>`;
-      }).join('');
-    }
-
-    function renderPagination(total, currentPage) {
-      const pages = Math.ceil(total / LIMIT);
-      if (pages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
-      let html = '';
-      if (currentPage > 0) html += `<button class="page-btn" onclick="doSearch(${currentPage - 1})">← Anterior</button>`;
-      html += `<span class="page-info">Pag ${currentPage + 1} de ${pages}</span>`;
-      if (currentPage < pages - 1) html += `<button class="page-btn" onclick="doSearch(${currentPage + 1})">Proxima →</button>`;
-      document.getElementById('pagination').innerHTML = html;
-    }
-
-    async function loadFeatured() {
-      try {
-        const res = await fetch('/api/search?q=romance&limit=18&offset=0');
-        const data = await res.json();
-        renderGrid(data.data || [], 'featuredGrid');
-      } catch(e) {
-        document.getElementById('featuredGrid').innerHTML = '<p class="error-msg">Nao foi possivel carregar.</p>';
-      }
-    }
-
-    loadFeatured();
-  </script>
+  <footer>Hana Reader - leitor privado usando MangaDex.</footer>
+  <script src="/static/js/main.js"></script>
 </body>
 </html>
