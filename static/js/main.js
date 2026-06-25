@@ -7,6 +7,7 @@ const coverOf = (m) => {
   return cover?.attributes?.fileName ? `/api/cover/${m.id}/${cover.attributes.fileName}` : "";
 };
 const statusPt = { ongoing: "Em andamento", completed: "Completo", hiatus: "Hiato", cancelled: "Cancelado" };
+const PAGE_SIZE = 40;
 const tagPt = {
   Romance: "Romance", Drama: "Drama", Comedy: "Comedia", Fantasy: "Fantasia", "Slice of Life": "Cotidiano",
   "Full Color": "Colorido", Webtoon: "Webtoon", Action: "Acao", Adventure: "Aventura", Mystery: "Misterio",
@@ -46,7 +47,7 @@ function renderCards(items) {
 }
 
 function renderPager(total, page, load) {
-  const pages = Math.ceil(Math.min(total, 10000) / 20);
+  const pages = Math.ceil(Math.min(total, 10000) / PAGE_SIZE);
   $("pager").innerHTML = pages > 1 ? `
     <button ${page < 1 ? "disabled" : ""} data-page="${page - 1}">Anterior</button>
     <span>Pagina ${page + 1} de ${pages}</span>
@@ -63,8 +64,8 @@ function initHome() {
     page = nextPage;
     $("mangaGrid").innerHTML = `<div class="loading"></div>`;
     $("clearBtn").hidden = mode === "popular" && !tag && !letter;
-    const qs = new URLSearchParams({ limit: "20", offset: String(page * 20) });
-    let url = "/api/search?q=romance&" + qs;
+    const qs = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
+    let url = "/api/browse?" + qs;
     if (mode === "search") { qs.set("q", query); url = "/api/search?" + qs; }
     if (mode === "browse") {
       if (tag) qs.set("tag", tag);

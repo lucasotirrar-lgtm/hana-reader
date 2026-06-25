@@ -25,6 +25,16 @@ def md_get(path, **params):
     return r.json()
 
 
+def chapter_file(chapter_id, page, quality):
+    data = md_get("/at-home/server/" + chapter_id)
+    chapter = data.get("chapter") or {}
+    key = "dataSaver" if quality == "data-saver" else "data"
+    files = chapter.get(key, [])
+    if page < 1 or page > len(files):
+        return None
+    return f"{data['baseUrl']}/{quality}/{chapter['hash']}/{files[page - 1]}"
+
+
 def manga_params(limit, offset, order=None):
     params = {
         "limit": limit,
@@ -143,13 +153,31 @@ def chapter_info(chapter_id):
 
 @app.get("/api/chapter/<chapter_id>/pages")
 def chapter_pages(chapter_id):
-    quality = "data-saver" if request.args.get("quality") == "saver" else "data"
+    quality = "data" if request.args.get("quality") == "full" else "data-saver"
     try:
         data = md_get("/at-home/server/" + chapter_id)
         chapter = data.get("chapter") or {}
         files = chapter.get("dataSaver" if quality == "data-saver" else "data", [])
-        pages = [f"{data['baseUrl']}/{quality}/{chapter['hash']}/{name}" for name in files]
+        pages = [f"/api/page/{chapter_id}/{i}?quality={'full' if quality == 'data' else 'saver'}" for i in range(1, len(files) + 1)]
         return jsonify({"pages": pages, "total": len(pages), "quality": quality})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.get("/api/page/<chapter_id>/<int:page>")
+def page_image(chapter_id, page):
+    quality = "data" if request.args.get("quality") == "full" else "data-saver"
+    try:
+        url = chapter_file(chapter_id, page, quality)
+        if not url:
+            return jsonify({"error": "Page not found"}), 404
+        r = SESSION.get(url, timeout=20)
+        r.raise_for_status()
+        return Response(
+            r.content,
+            content_type=r.headers.get("content-type", "image/jpeg"),
+            headers={"Cache-Control": "public, max-age=604800, immutable"},
+        )
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 
